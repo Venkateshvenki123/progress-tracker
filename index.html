@@ -1,0 +1,3852 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Cloud, Linux, Networking | Training Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      background: #090d16;
+      color: #f8fafc;
+      --surface: rgba(17, 24, 39, .82);
+      --surface-raised: rgba(30, 41, 59, .76);
+      --line: rgba(148, 163, 184, .16);
+      --indigo: #818cf8;
+      --cyan: #38bdf8;
+      --green: #34d399;
+      --purple: #a78bfa;
+      --amber: #fbbf24;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .24);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(ellipse at 50% -18%, #202c49 0, #101725 36%, #090d16 78%); background-attachment: fixed; }
+    header { position: sticky; top: 0; z-index: 2; background: rgba(12, 18, 30, .82); border-bottom: 1px solid var(--line); backdrop-filter: blur(16px); box-shadow: 0 8px 30px rgba(0, 0, 0, .2); }
+    .wrap { max-width: 1400px; margin: auto; padding: 1rem; }
+    .topline, nav, .toolbar, .actions, .pair-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+    .topline { justify-content: space-between; }
+    h1 { font-size: 1.2rem; margin: 0; letter-spacing: -.035em; }
+    nav { overflow-x: auto; flex-wrap: nowrap; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; border-radius: 6px; padding: .5rem .8rem; background: #2563eb; }
+    button.secondary { background: #334155; }
+    button.danger { background: #b91c1c; }
+    button[aria-selected="true"] { background: rgba(99, 102, 241, .16); color: #c7d2fe; box-shadow: inset 0 -2px #818cf8; }
+    input, select, textarea { width: 100%; background: rgba(9, 13, 22, .72); border: 1px solid var(--line); border-radius: 7px; padding: .5rem .6rem; transition: border-color .18s, box-shadow .18s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(129, 140, 248, .16); }
+    input[type="checkbox"] { width: auto; }
+    label { display: block; color: #cbd5e1; font-size: .9rem; }
+    main { max-width: 1400px; margin: auto; padding: 1rem; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .card { background: linear-gradient(145deg, rgba(30, 41, 59, .88), rgba(15, 23, 42, .83)); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem; margin-bottom: 1rem; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+    .metric { color: #94a3b8; font-size: .82rem; text-transform: uppercase; letter-spacing: .055em; }
+    .value { font-size: 1.75rem; font-weight: 700; letter-spacing: -.04em; color: #e0e7ff; }
+    .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td { text-align: left; vertical-align: top; padding: .65rem; border-bottom: 1px solid #334155; }
+    th { color: #a5b4fc; background: rgba(15, 23, 42, .94); position: sticky; top: 0; }
+    td.action { white-space: nowrap; }
+    .muted { color: #94a3b8; }
+    .status { padding: .25rem .6rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(15, 23, 42, .66); }
+    .pair-row input { flex: 1; min-width: 240px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+    .notice { min-height: 1.5rem; color: #fbbf24; }
+    .progress { height: 8px; background: #0f172a; border-radius: 10px; overflow: hidden; }
+    .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--indigo), var(--cyan)); box-shadow: 0 0 14px rgba(56, 189, 248, .5); transition: width .35s ease; }
+    .phase-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .8rem; }
+    .phase-card { padding: .85rem; border: 1px solid var(--line); border-radius: 9px; background: rgba(15, 23, 42, .5); }
+    .phase-card strong { color: #e2e8f0; }
+    .pill { display: inline-flex; padding: .15rem .5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--cyan); font-size: .75rem; font-weight: 700; }
+    .metric-green { color: var(--green); }
+    .metric-violet { color: var(--purple); }
+    .dialog-backdrop { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 1rem; background: #000b; }
+    .dialog-backdrop[hidden] { display: none; }
+    .dialog { width: min(100%, 520px); padding: 1.25rem; border: 1px solid #475569; border-radius: 8px; background: #1e293b; box-shadow: 0 20px 60px #0008; }
+    .dialog h2 { margin-top: 0; }
+    @media (max-width: 600px) { .wrap, main { padding: .7rem; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap topline">
+      <h1>Cloud, Linux, Networking Training Dashboard</h1>
+      <span class="status" id="syncStatus" role="status" aria-live="polite">Loading local data…</span>
+    </div>
+    <nav class="wrap" aria-label="Tracker tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="dashboard">Dashboard</button>
+      <button role="tab" aria-selected="false" data-tab="weekly">Weekly</button>
+      <button role="tab" aria-selected="false" data-tab="topics">Topics</button>
+      <button role="tab" aria-selected="false" data-tab="projects">Projects</button>
+      <button role="tab" aria-selected="false" data-tab="scenarios">Scenarios</button>
+      <button role="tab" aria-selected="false" data-tab="setup">Setup</button>
+      <button role="tab" aria-selected="false" data-tab="quizlog">Quiz Log</button>
+    </nav>
+  </header>
+  <main>
+    <section class="panel active" id="dashboard" role="tabpanel">
+      <div class="cards" id="metrics"></div>
+      <div class="card"><h2>Progress by phase</h2><div id="categoryProgress" class="phase-list"></div></div>
+      <div class="card"><h2>Weak areas</h2><div id="weakAreas" class="muted"></div></div>
+    </section>
+    <section class="panel" id="weekly" role="tabpanel">
+      <div class="toolbar"><h2>Weekly study log</h2><button data-add="weekly">Add week</button></div>
+      <div class="table-wrap"><table><thead id="weeklyHead"></thead><tbody id="weeklyBody"></tbody></table></div>
+    </section>
+    <section class="panel" id="topics" role="tabpanel">
+      <div class="toolbar">
+        <h2>Topics</h2><input id="topicSearch" aria-label="Search topics" placeholder="Search topics, hints, notes">
+        <select id="topicPhaseFilter" aria-label="Filter topics by phase"><option value="">All phases</option></select>
+        <select id="topicLabelFilter" aria-label="Filter topics by label"><option value="">All labels</option><option>CORE</option><option>IMPORTANT</option><option>OPTIONAL</option></select>
+        <select id="topicStatusFilter" aria-label="Filter topics by status"><option value="">All statuses</option><option>Not Started</option><option>In Progress</option><option>Completed</option></select>
+        <button data-add="topics">Add topic</button>
+      </div>
+      <div class="table-wrap"><table><thead id="topicsHead"></thead><tbody id="topicsBody"></tbody></table></div>
+    </section>
+    <section class="panel" id="projects" role="tabpanel">
+      <div class="toolbar"><h2>Projects</h2><button data-add="projects">Add project</button></div>
+      <div class="table-wrap"><table><thead id="projectsHead"></thead><tbody id="projectsBody"></tbody></table></div>
+    </section>
+    <section class="panel" id="scenarios" role="tabpanel">
+      <div class="toolbar"><h2>Scenarios</h2><button data-add="scenarios">Add scenario</button></div>
+      <div class="table-wrap"><table><thead id="scenariosHead"></thead><tbody id="scenariosBody"></tbody></table></div>
+    </section>
+    <section class="panel" id="setup" role="tabpanel">
+      <div class="card">
+        <h2>Setup checklist</h2>
+        <p class="muted">Track prerequisite accounts, tools, and lab setup.</p>
+        <div class="table-wrap"><table><thead id="setup_itemsHead"></thead><tbody id="setup_itemsBody"></tbody></table></div>
+      </div>
+      <div class="card">
+        <h2>Cloud connection</h2>
+        <p class="muted">Use your Supabase project URL and public anon/publishable key. Never enter a service-role key here. Cloud sync requires the restricted <code>vault_create</code>, <code>vault_get</code>, and <code>vault_save</code> RPCs to be securely configured.</p>
+        <div class="grid">
+          <label>Project URL<input id="supabaseUrl" type="url" autocomplete="url" placeholder="https://pgcngdtmdmxvymymrqsk.supabase.co"></label>
+          <label>Public anon key<input id="supabaseKey" type="password" autocomplete="off"></label>
+        </div>
+        <p class="actions"><button id="saveConfig">Save and connect</button><button class="secondary" id="syncNow">Sync now</button></p>
+        <p id="setupNotice" class="notice" role="status" aria-live="polite"></p>
+      </div>
+      <div class="card">
+        <h2>Pair another device</h2>
+        <p class="muted">The link contains your private bearer token. Share it only with a device you trust. Anyone with the link can access this vault.</p>
+        <div class="pair-row"><input id="pairingLink" readonly aria-label="Private device pairing link"><button class="secondary" id="copyPairing">Copy link</button></div>
+      </div>
+      <div class="card">
+        <h2>Backups and export</h2>
+        <div class="actions">
+          <button class="secondary" id="exportJson">Export JSON backup</button>
+          <label class="secondary" style="padding:.5rem .8rem;border-radius:6px;cursor:pointer">Import JSON<input id="importJson" type="file" accept="application/json,.json" hidden></label>
+          <button id="exportExcel">Export Excel workbook</button>
+        </div>
+        <p id="exportNotice" class="notice" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+    <section class="panel" id="quizlog" role="tabpanel">
+      <div class="toolbar"><h2>Quiz log</h2><button data-add="quiz_log">Add quiz</button></div>
+      <div class="table-wrap"><table><thead id="quiz_logHead"></thead><tbody id="quiz_logBody"></tbody></table></div>
+    </section>
+  </main>
+  <div id="choiceDialog" class="dialog-backdrop" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="choiceTitle" aria-describedby="choiceBody">
+      <h2 id="choiceTitle"></h2>
+      <p id="choiceBody"></p>
+      <div id="choiceActions" class="actions"></div>
+    </section>
+  </div>
+  <script>
+    'use strict';
+    const KEYS = {
+      state: 'tracker_local_state',
+      config: 'tracker_supabase_config',
+      vault: 'tracker_vault_creds',
+      cloudVersion: 'tracker_cloud_version',
+      dirty: 'tracker_dirty',
+      queue: 'tracker_sync_queue',
+      migrationDecision: 'tracker_migration_decision'
+    };
+    const DEFAULT_SUPABASE_URL = 'https://pgcngdtmdmxvymymrqsk.supabase.co';
+    const STATUSES = ['Not Started', 'In Progress', 'Completed'];
+    const CURRICULUM_VERSION = 1;
+    const DEFAULT_STATE = {
+  "version": 1,
+  "last_updated": "2026-10-24T15:25:38.389Z",
+  "settings": {
+    "theme": "dark",
+    "user_title": "Cloud, Linux, Networking Training Dashboard",
+    "target_hours": 330,
+    "start_date": "2026-10-01",
+    "current_week": 1,
+    "curriculum_version": 1
+  },
+  "weekly": [
+    {
+      "id": 1,
+      "week_num": 1,
+      "start_date": "2026-10-01",
+      "focus": "IT Fundamentals",
+      "deliverables": "Computer, OS, client/server, IP, DNS, ports, HTTP, databases, web architecture",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "In Progress",
+      "notes": ""
+    },
+    {
+      "id": 2,
+      "week_num": 2,
+      "start_date": "2026-10-08",
+      "focus": "Networking basics",
+      "deliverables": "LAN/WAN, router/switch, MAC, public/private IP, gateway, DHCP, NAT, ARP, routing",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "In Progress",
+      "notes": ""
+    },
+    {
+      "id": 3,
+      "week_num": 3,
+      "start_date": "2026-10-15",
+      "focus": "TCP/IP",
+      "deliverables": "OSI, TCP/IP model, TCP handshake, TCP vs UDP, ports, sockets, important ports",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 4,
+      "week_num": 4,
+      "start_date": "2026-10-22",
+      "focus": "Subnetting and network tools",
+      "deliverables": "CIDR, subnet masks, /8 to /28 practice, ping, traceroute, dig, ss, curl; Phase 2 test",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 5,
+      "week_num": 5,
+      "start_date": "2026-10-29",
+      "focus": "Linux basics",
+      "deliverables": "Install Ubuntu VM, navigation, file commands, grep/find, filesystem",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "In Progress",
+      "notes": ""
+    },
+    {
+      "id": 6,
+      "week_num": 6,
+      "start_date": "2026-11-05",
+      "focus": "Linux permissions, users, processes",
+      "deliverables": "chmod, chown, users/groups, sudo, ps, top, kill, job control",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 7,
+      "week_num": 7,
+      "start_date": "2026-11-12",
+      "focus": "Linux services, packages, storage, networking",
+      "deliverables": "systemctl, journalctl, apt, df/du/lsblk, mount, ip/ss/curl, scp/rsync",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 8,
+      "week_num": 8,
+      "start_date": "2026-11-19",
+      "focus": "SSH + Project 1",
+      "deliverables": "SSH keys, authorized_keys, troubleshooting; PROJECT 1: Linux Web Server; Phase 3 test",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 9,
+      "week_num": 9,
+      "start_date": "2026-11-26",
+      "focus": "Cloud fundamentals + AWS setup",
+      "deliverables": "Cloud concepts, IaaS/PaaS/SaaS, regions/AZs; AWS account, billing alert, global infrastructure",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 10,
+      "week_num": 10,
+      "start_date": "2026-12-03",
+      "focus": "AWS IAM and EC2 basics",
+      "deliverables": "Users, roles, policies, MFA; AMI, instance types, security groups, key pairs, launch and SSH",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 11,
+      "week_num": 11,
+      "start_date": "2026-12-10",
+      "focus": "EC2 hands-on and S3",
+      "deliverables": "Elastic IP, EBS, user data, Nginx on EC2; S3 buckets, policies, encryption",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 12,
+      "week_num": 12,
+      "start_date": "2026-12-17",
+      "focus": "VPC and cloud networking",
+      "deliverables": "VPC, subnets, route tables, IGW, NAT, SG vs NACL, bastion, VPN, peering",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 13,
+      "week_num": 13,
+      "start_date": "2026-12-24",
+      "focus": "Load balancing, scaling, DNS",
+      "deliverables": "ALB, target groups, health checks, Auto Scaling, Route 53",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 14,
+      "week_num": 14,
+      "start_date": "2026-12-31",
+      "focus": "RDS, CloudWatch, CLI + Project 2",
+      "deliverables": "RDS, backups, CloudWatch, AWS CLI; PROJECT 2: AWS Website Hosting; Phase 5 test",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 15,
+      "week_num": 15,
+      "start_date": "2027-01-07",
+      "focus": "Project 3 + Azure basics",
+      "deliverables": "PROJECT 3: AWS 3-Tier Architecture; Azure subscription, resource groups, AWS vs Azure mapping",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 16,
+      "week_num": 16,
+      "start_date": "2027-01-14",
+      "focus": "Azure compute, network, storage",
+      "deliverables": "Azure VM, VNet, subnet, NSG, IPs, Storage Account, Blob",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 17,
+      "week_num": 17,
+      "start_date": "2027-01-21",
+      "focus": "Azure identity, monitoring + Project 4",
+      "deliverables": "Entra ID, RBAC, Monitor, SQL, Load Balancer, DNS; PROJECT 4: Azure Web Application; Phase 6 test",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 18,
+      "week_num": 18,
+      "start_date": "2027-01-28",
+      "focus": "Cloud security",
+      "deliverables": "CIA triad, authN/authZ, encryption, TLS, secrets, backups, logging, common mistakes",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 19,
+      "week_num": 19,
+      "start_date": "2027-02-04",
+      "focus": "Troubleshooting scenarios 1 to 8",
+      "deliverables": "Method, HTTP codes, CPU/disk issues, logs; scenarios 1 to 8",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 20,
+      "week_num": 20,
+      "start_date": "2027-02-11",
+      "focus": "Troubleshooting scenarios 9 to 15 + Project 5",
+      "deliverables": "SSL problems; scenarios 9 to 15; PROJECT 5: Troubleshooting Project",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 21,
+      "week_num": 21,
+      "start_date": "2027-02-18",
+      "focus": "Basic DevOps",
+      "deliverables": "Git, GitHub, CI/CD, Docker, Dockerfile, Compose, Nginx, environment variables",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    },
+    {
+      "id": 22,
+      "week_num": 22,
+      "start_date": "2027-02-25",
+      "focus": "Interview prep and assessment",
+      "deliverables": "Interview mode by topic, final exam, job-readiness assessment, resume and GitHub write-ups",
+      "planned_hours": 15,
+      "actual_hours": 0,
+      "hands_on": false,
+      "status": "Not Started",
+      "notes": ""
+    }
+  ],
+  "topics": [
+    {
+      "id": 1,
+      "phase": "1. IT Fundamentals",
+      "title": "Computer, CPU, RAM, storage",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": "RAM vs ROM vs storage"
+    },
+    {
+      "id": 2,
+      "phase": "1. IT Fundamentals",
+      "title": "HDD vs SSD",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 3,
+      "phase": "1. IT Fundamentals",
+      "title": "Operating system and kernel",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 4,
+      "phase": "1. IT Fundamentals",
+      "title": "Process vs program",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "2026-10-01",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 5,
+      "phase": "1. IT Fundamentals",
+      "title": "Client and server",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "2026-10-01",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 6,
+      "phase": "1. IT Fundamentals",
+      "title": "IP address and domain name",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": true,
+      "completed_date": "2026-10-01",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 7,
+      "phase": "1. IT Fundamentals",
+      "title": "DNS (overview)",
+      "label": "CORE",
+      "week": 1,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": "DNS: ping by IP works but by name fails"
+    },
+    {
+      "id": 8,
+      "phase": "1. IT Fundamentals",
+      "title": "Ports and protocols",
+      "label": "CORE",
+      "week": 1,
+      "status": "In Progress",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": "Ports and protocols"
+    },
+    {
+      "id": 9,
+      "phase": "1. IT Fundamentals",
+      "title": "HTTP and HTTPS",
+      "label": "CORE",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 10,
+      "phase": "1. IT Fundamentals",
+      "title": "SSH and FTP/SFTP (overview)",
+      "label": "IMPORTANT",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 11,
+      "phase": "1. IT Fundamentals",
+      "title": "Databases",
+      "label": "CORE",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 12,
+      "phase": "1. IT Fundamentals",
+      "title": "Web server vs application server",
+      "label": "CORE",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 13,
+      "phase": "1. IT Fundamentals",
+      "title": "Virtual machine vs container (overview)",
+      "label": "IMPORTANT",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 14,
+      "phase": "1. IT Fundamentals",
+      "title": "Full web architecture diagram",
+      "label": "CORE",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 15,
+      "phase": "1. IT Fundamentals",
+      "title": "Phase 1 test",
+      "label": "CORE",
+      "week": 1,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 16,
+      "phase": "2. Networking",
+      "title": "Network, LAN, WAN, Internet, intranet",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 17,
+      "phase": "2. Networking",
+      "title": "Router, switch, firewall, modem, access point",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 18,
+      "phase": "2. Networking",
+      "title": "MAC address",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 19,
+      "phase": "2. Networking",
+      "title": "Public vs private IP",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 20,
+      "phase": "2. Networking",
+      "title": "IPv4 basics",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 21,
+      "phase": "2. Networking",
+      "title": "IPv6 basics",
+      "label": "OPTIONAL",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 22,
+      "phase": "2. Networking",
+      "title": "Default gateway",
+      "label": "CORE",
+      "week": 2,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 23,
+      "phase": "2. Networking",
+      "title": "DHCP",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 24,
+      "phase": "2. Networking",
+      "title": "NAT",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 25,
+      "phase": "2. Networking",
+      "title": "ARP",
+      "label": "IMPORTANT",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 26,
+      "phase": "2. Networking",
+      "title": "Routing basics",
+      "label": "CORE",
+      "week": 2,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 27,
+      "phase": "2. Networking",
+      "title": "OSI model",
+      "label": "CORE",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 28,
+      "phase": "2. Networking",
+      "title": "TCP/IP model",
+      "label": "CORE",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 29,
+      "phase": "2. Networking",
+      "title": "TCP and three-way handshake",
+      "label": "CORE",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 30,
+      "phase": "2. Networking",
+      "title": "UDP and TCP vs UDP",
+      "label": "CORE",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 31,
+      "phase": "2. Networking",
+      "title": "Ports and sockets",
+      "label": "CORE",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 32,
+      "phase": "2. Networking",
+      "title": "Important port numbers (22, 53, 80, 443, 3306, 5432, 3389)",
+      "label": "CORE",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 33,
+      "phase": "2. Networking",
+      "title": "Telnet, POP3, IMAP details",
+      "label": "OPTIONAL",
+      "week": 3,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 34,
+      "phase": "2. Networking",
+      "title": "Subnetting: CIDR and subnet mask",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 35,
+      "phase": "2. Networking",
+      "title": "Network, broadcast and usable IPs",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 36,
+      "phase": "2. Networking",
+      "title": "Subnetting practice: /8, /16, /24",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 37,
+      "phase": "2. Networking",
+      "title": "Subnetting practice: /25 to /28",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 38,
+      "phase": "2. Networking",
+      "title": "ping and traceroute/tracert",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 39,
+      "phase": "2. Networking",
+      "title": "ip / ipconfig / ifconfig",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 40,
+      "phase": "2. Networking",
+      "title": "nslookup and dig",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 41,
+      "phase": "2. Networking",
+      "title": "netstat/ss and curl",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 42,
+      "phase": "2. Networking",
+      "title": "telnet, nc, arp, route",
+      "label": "IMPORTANT",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 43,
+      "phase": "2. Networking",
+      "title": "Scenario: server running but website not accessible",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 44,
+      "phase": "2. Networking",
+      "title": "Phase 2 test",
+      "label": "CORE",
+      "week": 4,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 45,
+      "phase": "3. Linux",
+      "title": "What is Linux: kernel and distributions",
+      "label": "CORE",
+      "week": 5,
+      "status": "In Progress",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": "Taught, not tested yet"
+    },
+    {
+      "id": 46,
+      "phase": "3. Linux",
+      "title": "CLI, terminal, shell, Bash",
+      "label": "CORE",
+      "week": 5,
+      "status": "In Progress",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": "Taught, not tested yet"
+    },
+    {
+      "id": 47,
+      "phase": "3. Linux",
+      "title": "Install Ubuntu Server in VirtualBox",
+      "label": "CORE",
+      "week": 5,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 48,
+      "phase": "3. Linux",
+      "title": "Navigation: pwd, ls, cd",
+      "label": "CORE",
+      "week": 5,
+      "status": "In Progress",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": "Explained in words, but no real Ubuntu output sent yet. Type cd / then ls"
+    },
+    {
+      "id": 49,
+      "phase": "3. Linux",
+      "title": "File commands: mkdir, touch, cp, mv, rm",
+      "label": "CORE",
+      "week": 5,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 50,
+      "phase": "3. Linux",
+      "title": "Viewing files: cat, less, head, tail",
+      "label": "CORE",
+      "week": 5,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 51,
+      "phase": "3. Linux",
+      "title": "Searching: grep, find, locate",
+      "label": "CORE",
+      "week": 5,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 52,
+      "phase": "3. Linux",
+      "title": "Text tools: sort, uniq, cut, wc",
+      "label": "IMPORTANT",
+      "week": 5,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 53,
+      "phase": "3. Linux",
+      "title": "awk and sed",
+      "label": "IMPORTANT",
+      "week": 5,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 54,
+      "phase": "3. Linux",
+      "title": "echo, history, clear, man",
+      "label": "CORE",
+      "week": 5,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 55,
+      "phase": "3. Linux",
+      "title": "Filesystem directories (/etc, /var, /home ...)",
+      "label": "CORE",
+      "week": 5,
+      "status": "Completed",
+      "hands_on": false,
+      "completed_date": "2026-10-12",
+      "hours": 0,
+      "hints": "",
+      "notes": "/root is the admin’s home folder, not the admin. Write the full path /var/log. Untested: /usr, /opt, /bin, /sbin, /dev, /proc, /sys"
+    },
+    {
+      "id": 56,
+      "phase": "3. Linux",
+      "title": "Permissions: r, w, x",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 57,
+      "phase": "3. Linux",
+      "title": "chmod (symbolic and numeric)",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 58,
+      "phase": "3. Linux",
+      "title": "chown and chgrp",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 59,
+      "phase": "3. Linux",
+      "title": "Users and groups: useradd, passwd, usermod, groups, id",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 60,
+      "phase": "3. Linux",
+      "title": "su, sudo and sudoers",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 61,
+      "phase": "3. Linux",
+      "title": "Processes: PID, PPID, ps, top, htop",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 62,
+      "phase": "3. Linux",
+      "title": "kill and pkill",
+      "label": "CORE",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 63,
+      "phase": "3. Linux",
+      "title": "Job control: jobs, bg, fg, nohup",
+      "label": "IMPORTANT",
+      "week": 6,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 64,
+      "phase": "3. Linux",
+      "title": "systemd: systemctl start/stop/restart/status/enable",
+      "label": "CORE",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 65,
+      "phase": "3. Linux",
+      "title": "journalctl and logs",
+      "label": "CORE",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 66,
+      "phase": "3. Linux",
+      "title": "Package management: apt",
+      "label": "CORE",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 67,
+      "phase": "3. Linux",
+      "title": "apt vs yum/dnf (Debian vs RHEL)",
+      "label": "IMPORTANT",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 68,
+      "phase": "3. Linux",
+      "title": "Storage: df, du, lsblk",
+      "label": "CORE",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 69,
+      "phase": "3. Linux",
+      "title": "Disks, partitions, filesystems, mount, fdisk",
+      "label": "IMPORTANT",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 70,
+      "phase": "3. Linux",
+      "title": "Linux networking: ip, ss, ping, curl, wget",
+      "label": "CORE",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 71,
+      "phase": "3. Linux",
+      "title": "dig and nslookup in Linux",
+      "label": "CORE",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 72,
+      "phase": "3. Linux",
+      "title": "scp and rsync",
+      "label": "IMPORTANT",
+      "week": 7,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 73,
+      "phase": "3. Linux",
+      "title": "SSH basics",
+      "label": "CORE",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 74,
+      "phase": "3. Linux",
+      "title": "SSH keys: public and private key",
+      "label": "CORE",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 75,
+      "phase": "3. Linux",
+      "title": "~/.ssh, authorized_keys and permissions",
+      "label": "CORE",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 76,
+      "phase": "3. Linux",
+      "title": "known_hosts and ssh-agent",
+      "label": "IMPORTANT",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 77,
+      "phase": "3. Linux",
+      "title": "Password vs key authentication",
+      "label": "CORE",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 78,
+      "phase": "3. Linux",
+      "title": "SSH troubleshooting exercises",
+      "label": "CORE",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 79,
+      "phase": "3. Linux",
+      "title": "Phase 3 test",
+      "label": "CORE",
+      "week": 8,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 80,
+      "phase": "4. Cloud Fundamentals",
+      "title": "What is cloud computing; on-premises vs cloud",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 81,
+      "phase": "4. Cloud Fundamentals",
+      "title": "Data centers, virtualization, hypervisor",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 82,
+      "phase": "4. Cloud Fundamentals",
+      "title": "Scalability and elasticity",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 83,
+      "phase": "4. Cloud Fundamentals",
+      "title": "High availability and fault tolerance",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 84,
+      "phase": "4. Cloud Fundamentals",
+      "title": "Disaster recovery and backup",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 85,
+      "phase": "4. Cloud Fundamentals",
+      "title": "Regions, Availability Zones, edge locations",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 86,
+      "phase": "4. Cloud Fundamentals",
+      "title": "IaaS, PaaS, SaaS",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 87,
+      "phase": "4. Cloud Fundamentals",
+      "title": "Public, private, hybrid, multi-cloud",
+      "label": "IMPORTANT",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 88,
+      "phase": "4. Cloud Fundamentals",
+      "title": "Phase 4 test",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 89,
+      "phase": "5. AWS",
+      "title": "AWS account and billing alert",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 90,
+      "phase": "5. AWS",
+      "title": "AWS global infrastructure",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 91,
+      "phase": "5. AWS",
+      "title": "Console and CLI intro",
+      "label": "CORE",
+      "week": 9,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 92,
+      "phase": "5. AWS",
+      "title": "IAM: users and groups",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 93,
+      "phase": "5. AWS",
+      "title": "IAM: roles and policies",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 94,
+      "phase": "5. AWS",
+      "title": "Least privilege, access keys, MFA",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 95,
+      "phase": "5. AWS",
+      "title": "IAM policy troubleshooting",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 96,
+      "phase": "5. AWS",
+      "title": "EC2: AMI, instance types, vCPU, RAM",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 97,
+      "phase": "5. AWS",
+      "title": "EC2: key pairs and security groups",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 98,
+      "phase": "5. AWS",
+      "title": "Launch and SSH into an EC2 instance",
+      "label": "CORE",
+      "week": 10,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 99,
+      "phase": "5. AWS",
+      "title": "EC2: public, private and Elastic IP",
+      "label": "CORE",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 100,
+      "phase": "5. AWS",
+      "title": "EC2: EBS volumes",
+      "label": "CORE",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 101,
+      "phase": "5. AWS",
+      "title": "EC2: user data and metadata",
+      "label": "IMPORTANT",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 102,
+      "phase": "5. AWS",
+      "title": "Install Nginx and host a website on EC2",
+      "label": "CORE",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 103,
+      "phase": "5. AWS",
+      "title": "S3: buckets, objects, keys",
+      "label": "CORE",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 104,
+      "phase": "5. AWS",
+      "title": "S3: storage classes, versioning, lifecycle",
+      "label": "IMPORTANT",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 105,
+      "phase": "5. AWS",
+      "title": "S3: encryption, bucket policy, public vs private",
+      "label": "CORE",
+      "week": 11,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 106,
+      "phase": "5. AWS",
+      "title": "VPC, CIDR, subnets",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 107,
+      "phase": "5. AWS",
+      "title": "Route tables and Internet Gateway",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 108,
+      "phase": "5. AWS",
+      "title": "NAT Gateway",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 109,
+      "phase": "5. AWS",
+      "title": "Security Group vs Network ACL",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 110,
+      "phase": "5. AWS",
+      "title": "Build a VPC with public and private subnets",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 111,
+      "phase": "5. AWS",
+      "title": "Load Balancer: ALB, listeners, rules",
+      "label": "CORE",
+      "week": 13,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 112,
+      "phase": "5. AWS",
+      "title": "Target groups and health checks",
+      "label": "CORE",
+      "week": 13,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 113,
+      "phase": "5. AWS",
+      "title": "Auto Scaling: launch template and ASG",
+      "label": "CORE",
+      "week": 13,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 114,
+      "phase": "5. AWS",
+      "title": "Scaling policies",
+      "label": "IMPORTANT",
+      "week": 13,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 115,
+      "phase": "5. AWS",
+      "title": "Route 53: hosted zones, A, CNAME, Alias",
+      "label": "CORE",
+      "week": 13,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 116,
+      "phase": "5. AWS",
+      "title": "Route 53 health checks",
+      "label": "IMPORTANT",
+      "week": 13,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 117,
+      "phase": "5. AWS",
+      "title": "RDS: MySQL/PostgreSQL, Multi-AZ",
+      "label": "CORE",
+      "week": 14,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 118,
+      "phase": "5. AWS",
+      "title": "RDS: backups, snapshots, security",
+      "label": "CORE",
+      "week": 14,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 119,
+      "phase": "5. AWS",
+      "title": "CloudWatch: metrics and logs",
+      "label": "CORE",
+      "week": 14,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 120,
+      "phase": "5. AWS",
+      "title": "CloudWatch: alarms and dashboards",
+      "label": "CORE",
+      "week": 14,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 121,
+      "phase": "5. AWS",
+      "title": "AWS CLI",
+      "label": "CORE",
+      "week": 14,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 122,
+      "phase": "5. AWS",
+      "title": "Phase 5 test",
+      "label": "CORE",
+      "week": 14,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 123,
+      "phase": "6. Azure",
+      "title": "Azure subscription, resource group, region",
+      "label": "CORE",
+      "week": 15,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 124,
+      "phase": "6. Azure",
+      "title": "AWS vs Azure service mapping",
+      "label": "CORE",
+      "week": 15,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 125,
+      "phase": "6. Azure",
+      "title": "Azure Virtual Machines",
+      "label": "CORE",
+      "week": 16,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 126,
+      "phase": "6. Azure",
+      "title": "Virtual Network, subnet, NSG",
+      "label": "CORE",
+      "week": 16,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 127,
+      "phase": "6. Azure",
+      "title": "Public and private IP in Azure",
+      "label": "CORE",
+      "week": 16,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 128,
+      "phase": "6. Azure",
+      "title": "Storage Account and Blob Storage",
+      "label": "CORE",
+      "week": 16,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 129,
+      "phase": "6. Azure",
+      "title": "Entra ID and RBAC",
+      "label": "CORE",
+      "week": 17,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 130,
+      "phase": "6. Azure",
+      "title": "Azure Monitor",
+      "label": "IMPORTANT",
+      "week": 17,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 131,
+      "phase": "6. Azure",
+      "title": "Azure SQL",
+      "label": "IMPORTANT",
+      "week": 17,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 132,
+      "phase": "6. Azure",
+      "title": "Azure Load Balancer",
+      "label": "IMPORTANT",
+      "week": 17,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 133,
+      "phase": "6. Azure",
+      "title": "Azure DNS",
+      "label": "IMPORTANT",
+      "week": 17,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 134,
+      "phase": "6. Azure",
+      "title": "Phase 6 test",
+      "label": "CORE",
+      "week": 17,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 135,
+      "phase": "7. Cloud Networking",
+      "title": "Public vs private subnet traffic flow",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 136,
+      "phase": "7. Cloud Networking",
+      "title": "Internet Gateway and NAT traffic flow",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 137,
+      "phase": "7. Cloud Networking",
+      "title": "Bastion host",
+      "label": "CORE",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 138,
+      "phase": "7. Cloud Networking",
+      "title": "VPN",
+      "label": "IMPORTANT",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 139,
+      "phase": "7. Cloud Networking",
+      "title": "VPC peering",
+      "label": "IMPORTANT",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 140,
+      "phase": "7. Cloud Networking",
+      "title": "Private endpoints",
+      "label": "OPTIONAL",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 141,
+      "phase": "7. Cloud Networking",
+      "title": "Cloud firewall concepts",
+      "label": "IMPORTANT",
+      "week": 12,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 142,
+      "phase": "8. Security",
+      "title": "CIA triad",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 143,
+      "phase": "8. Security",
+      "title": "Authentication vs authorization",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 144,
+      "phase": "8. Security",
+      "title": "Encryption at rest and in transit, TLS",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 145,
+      "phase": "8. Security",
+      "title": "Secrets management",
+      "label": "IMPORTANT",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 146,
+      "phase": "8. Security",
+      "title": "Security groups, NACLs and firewalls review",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 147,
+      "phase": "8. Security",
+      "title": "Backups, logging and auditing",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 148,
+      "phase": "8. Security",
+      "title": "Common security mistakes",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 149,
+      "phase": "8. Security",
+      "title": "Phase 8 test",
+      "label": "CORE",
+      "week": 18,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 150,
+      "phase": "9. Monitoring & Troubleshooting",
+      "title": "Troubleshooting method: DNS, IP, port, firewall, service, app, DB, logs",
+      "label": "CORE",
+      "week": 19,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 151,
+      "phase": "9. Monitoring & Troubleshooting",
+      "title": "HTTP status codes: 403, 404, 500",
+      "label": "CORE",
+      "week": 19,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 152,
+      "phase": "9. Monitoring & Troubleshooting",
+      "title": "Linux resource issues: CPU and disk",
+      "label": "CORE",
+      "week": 19,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 153,
+      "phase": "9. Monitoring & Troubleshooting",
+      "title": "Reading logs (nginx, syslog, journalctl)",
+      "label": "CORE",
+      "week": 19,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 154,
+      "phase": "9. Monitoring & Troubleshooting",
+      "title": "SSL/TLS certificate problems",
+      "label": "IMPORTANT",
+      "week": 20,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 155,
+      "phase": "9. Monitoring & Troubleshooting",
+      "title": "Troubleshooting checkpoint test",
+      "label": "CORE",
+      "week": 20,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 156,
+      "phase": "10. Basic DevOps",
+      "title": "Git basics",
+      "label": "CORE",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 157,
+      "phase": "10. Basic DevOps",
+      "title": "GitHub",
+      "label": "CORE",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 158,
+      "phase": "10. Basic DevOps",
+      "title": "CI/CD concepts",
+      "label": "CORE",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 159,
+      "phase": "10. Basic DevOps",
+      "title": "Jenkins basics",
+      "label": "OPTIONAL",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 160,
+      "phase": "10. Basic DevOps",
+      "title": "Docker concepts: images and containers",
+      "label": "CORE",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 161,
+      "phase": "10. Basic DevOps",
+      "title": "Dockerfile",
+      "label": "IMPORTANT",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 162,
+      "phase": "10. Basic DevOps",
+      "title": "Docker Compose",
+      "label": "IMPORTANT",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 163,
+      "phase": "10. Basic DevOps",
+      "title": "Nginx basics (reverse proxy)",
+      "label": "IMPORTANT",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 164,
+      "phase": "10. Basic DevOps",
+      "title": "Environment variables",
+      "label": "IMPORTANT",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 165,
+      "phase": "10. Basic DevOps",
+      "title": "Maven basics",
+      "label": "OPTIONAL",
+      "week": 21,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 166,
+      "phase": "12. Interview & Assessment",
+      "title": "Interview mode: Linux",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 167,
+      "phase": "12. Interview & Assessment",
+      "title": "Interview mode: Networking",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 168,
+      "phase": "12. Interview & Assessment",
+      "title": "Interview mode: AWS",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 169,
+      "phase": "12. Interview & Assessment",
+      "title": "Interview mode: Azure",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 170,
+      "phase": "12. Interview & Assessment",
+      "title": "Interview mode: Troubleshooting and architecture",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 171,
+      "phase": "12. Interview & Assessment",
+      "title": "Interview mode: Security and DevOps",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 172,
+      "phase": "12. Interview & Assessment",
+      "title": "Final exam",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 173,
+      "phase": "12. Interview & Assessment",
+      "title": "Job-readiness assessment",
+      "label": "CORE",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    },
+    {
+      "id": 174,
+      "phase": "12. Interview & Assessment",
+      "title": "Resume and GitHub project write-ups",
+      "label": "IMPORTANT",
+      "week": 22,
+      "status": "Not Started",
+      "hands_on": false,
+      "completed_date": "",
+      "hours": 0,
+      "hints": "",
+      "notes": ""
+    }
+  ],
+  "projects": [
+    {
+      "id": 1,
+      "title": "Linux Web Server",
+      "build": "Ubuntu server with Nginx and Git, a simple website deployed, plus users, permissions, SSH keys, firewall and log checking",
+      "skills": "Linux, SSH, permissions, services",
+      "when": "After Phase 3 (Linux)",
+      "week": 8,
+      "status": "Not Started",
+      "progress": 0,
+      "hours": 0,
+      "start_date": "",
+      "end_date": "",
+      "notes": ""
+    },
+    {
+      "id": 2,
+      "title": "AWS Website Hosting",
+      "build": "Route 53 > Load Balancer > EC2 > Nginx",
+      "skills": "EC2, ALB, Route 53, security groups",
+      "when": "After Phase 5 (AWS)",
+      "week": 14,
+      "status": "Not Started",
+      "progress": 0,
+      "hours": 0,
+      "start_date": "",
+      "end_date": "",
+      "notes": ""
+    },
+    {
+      "id": 3,
+      "title": "AWS 3-Tier Architecture",
+      "build": "Internet > Load Balancer > web/app servers > private database, using VPC, subnets, route tables, NAT, EC2 and RDS",
+      "skills": "VPC, networking, security, RDS",
+      "when": "After Phase 5 (AWS)",
+      "week": 15,
+      "status": "Not Started",
+      "progress": 0,
+      "hours": 0,
+      "start_date": "",
+      "end_date": "",
+      "notes": ""
+    },
+    {
+      "id": 4,
+      "title": "Azure Web Application",
+      "build": "A similar architecture in Azure, then a comparison with your AWS version",
+      "skills": "Azure VM, VNet, NSG, Azure SQL",
+      "when": "After Phase 6 (Azure)",
+      "week": 17,
+      "status": "Not Started",
+      "progress": 0,
+      "hours": 0,
+      "start_date": "",
+      "end_date": "",
+      "notes": ""
+    },
+    {
+      "id": 5,
+      "title": "Troubleshooting Project",
+      "build": "A deliberately broken environment where you find the DNS, networking, security, Linux and application faults yourself",
+      "skills": "Everything",
+      "when": "Near the end",
+      "week": 20,
+      "status": "Not Started",
+      "progress": 0,
+      "hours": 0,
+      "start_date": "",
+      "end_date": "",
+      "notes": ""
+    }
+  ],
+  "scenarios": [
+    {
+      "id": 1,
+      "title": "EC2 cannot be accessed through SSH",
+      "category": "AWS / SSH",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 2,
+      "title": "Website is not opening",
+      "category": "Networking",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 3,
+      "title": "Port 80 is blocked",
+      "category": "Firewall",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 4,
+      "title": "Nginx is down",
+      "category": "Linux service",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 5,
+      "title": "DNS is not resolving",
+      "category": "DNS",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 6,
+      "title": "Server has high CPU",
+      "category": "Linux performance",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 7,
+      "title": "Server has low disk space",
+      "category": "Linux storage",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 8,
+      "title": "User cannot access S3",
+      "category": "AWS IAM",
+      "week": 19,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 9,
+      "title": "Application cannot connect to database",
+      "category": "Networking / DB",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 10,
+      "title": "AWS instance has no internet",
+      "category": "AWS VPC",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 11,
+      "title": "Azure VM cannot be accessed",
+      "category": "Azure",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 12,
+      "title": "Website returns HTTP 500",
+      "category": "Application",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 13,
+      "title": "Website returns HTTP 403",
+      "category": "Permissions",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 14,
+      "title": "Website returns HTTP 404",
+      "category": "Web server",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    },
+    {
+      "id": 15,
+      "title": "SSL certificate problem",
+      "category": "TLS",
+      "week": 20,
+      "hints": 0,
+      "status": "Not Started",
+      "root_cause": "",
+      "date": "",
+      "hours": 0,
+      "hands_on": false
+    }
+  ],
+  "setup_items": [
+    {
+      "id": 1,
+      "item": "Terminal / PowerShell working",
+      "when": "Now",
+      "status": "Not Started"
+    },
+    {
+      "id": 2,
+      "item": "VirtualBox installed",
+      "when": "Week 4-5",
+      "status": "Not Started"
+    },
+    {
+      "id": 3,
+      "item": "Ubuntu Server 24.04 VM created",
+      "when": "Week 5",
+      "status": "Completed"
+    },
+    {
+      "id": 4,
+      "item": "VS Code installed",
+      "when": "Week 5",
+      "status": "Not Started"
+    },
+    {
+      "id": 5,
+      "item": "AWS account created",
+      "when": "Week 9",
+      "status": "Not Started"
+    },
+    {
+      "id": 6,
+      "item": "AWS billing alert / budget set",
+      "when": "Week 9",
+      "status": "Not Started"
+    },
+    {
+      "id": 7,
+      "item": "MFA enabled on AWS root account",
+      "when": "Week 9",
+      "status": "Not Started"
+    },
+    {
+      "id": 8,
+      "item": "Azure free account created",
+      "when": "Week 15",
+      "status": "Not Started"
+    },
+    {
+      "id": 9,
+      "item": "Azure budget alert set",
+      "when": "Week 15",
+      "status": "Not Started"
+    },
+    {
+      "id": 10,
+      "item": "GitHub account created",
+      "when": "Week 21",
+      "status": "Not Started"
+    },
+    {
+      "id": 11,
+      "item": "Git installed",
+      "when": "Week 21",
+      "status": "Not Started"
+    },
+    {
+      "id": 12,
+      "item": "Docker installed",
+      "when": "Week 21",
+      "status": "Not Started"
+    }
+  ],
+  "quiz_log": [
+    {
+      "id": 1,
+      "date": "2026-10-12",
+      "week": 5,
+      "lesson": "Linux folder structure",
+      "type": "Quiz",
+      "score": 4,
+      "total": 5,
+      "percentage": 80,
+      "weak_areas": "/root is the admin’s home folder, not the admin. Write the full path /var/log. Untested: /usr, /opt, /bin, /sbin, /dev, /proc, /sys",
+      "notes": ""
+    }
+  ]
+};
+    const defaultState = () => {
+      const initial = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      initial.last_updated = new Date().toISOString();
+      return initial;
+    };
+    const fields = {
+      weekly: [
+        ['week_num', 'Week', 'number'], ['start_date', 'Starts', 'date'], ['focus', 'Focus', 'text'],
+        ['deliverables', 'Topics / deliverables', 'text'], ['planned_hours', 'Plan hours', 'number'],
+        ['actual_hours', 'Actual hours', 'number'], ['status', 'Status', 'status'],
+        ['hands_on', 'Hands-on', 'checkbox'], ['notes', 'Reflections', 'text']
+      ],
+      topics: [
+        ['id', '#', 'readonly'], ['phase', 'Phase', 'text'], ['title', 'Topic', 'text'],
+        ['label', 'Label', 'label'], ['week', 'Week', 'number'], ['status', 'Status', 'status'],
+        ['hands_on', 'Hands-on', 'checkbox'], ['completed_date', 'Completed', 'date'],
+        ['hours', 'Hours', 'number'], ['hints', 'Hints', 'text'], ['notes', 'Weak areas / notes', 'text']
+      ],
+      projects: [
+        ['id', '#', 'readonly'], ['title', 'Project', 'text'], ['build', 'What you build', 'text'],
+        ['skills', 'Skills', 'text'], ['week', 'Week', 'number'], ['when', 'Timing', 'text'],
+        ['status', 'Status', 'status'], ['notes', 'Notes / repository', 'text']
+      ],
+      scenarios: [
+        ['id', '#', 'readonly'], ['title', 'Scenario', 'text'], ['category', 'Category', 'text'],
+        ['week', 'Week', 'number'], ['hints', 'Hints used', 'number'], ['status', 'Status', 'status'],
+        ['root_cause', 'Root cause', 'text'], ['date', 'Date', 'date']
+      ],
+      setup_items: [
+        ['item', 'Setup item', 'text'], ['when', 'When', 'text'], ['status', 'Status', 'status']
+      ],
+      quiz_log: [
+        ['date', 'Date', 'date'], ['week', 'Week', 'number'], ['lesson', 'Lesson', 'text'],
+        ['type', 'Type', 'text'], ['score', 'Score', 'number'],
+        ['total', 'Total', 'number'], ['percentage', 'Percent', 'computed'],
+        ['weak_areas', 'Weak areas', 'text'], ['notes', 'Notes', 'text']
+      ]
+    };
+    let localStateError = '';
+    let stateNeedsPersistence = false;
+    let state = loadState();
+    let client = null;
+    let cloudVersion = Number(localStorage.getItem(KEYS.cloudVersion)) || 0;
+    let dirty = localStorage.getItem(KEYS.dirty) === 'true';
+    let saveTimer = 0;
+    let retryTimer = 0;
+    let retryDelay = 1500;
+    let revision = 0;
+    let syncing = false;
+    let migrationPrompted = false;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(KEYS.state);
+        if (!raw) return defaultState();
+        const value = JSON.parse(raw);
+        if (!isValidState(value)) throw new Error('Saved tracker data is not valid.');
+        return upgradeState(value);
+      } catch (error) {
+        console.error('Unable to load local tracker data:', error);
+        localStateError = error.message;
+        return defaultState();
+      }
+    }
+    function isValidState(value) {
+      return value && typeof value === 'object' &&
+        value.settings && typeof value.settings === 'object' && !Array.isArray(value.settings) &&
+        ['weekly', 'topics', 'projects', 'scenarios', 'quiz_log'].every(key =>
+          Array.isArray(value[key]) && value[key].every(item => item && typeof item === 'object' && !Array.isArray(item))
+        ) && (!('setup_items' in value) || (Array.isArray(value.setup_items) &&
+          value.setup_items.every(item => item && typeof item === 'object' && !Array.isArray(item))));
+    }
+    function normalizeStatus(value) {
+      return ({ 'Not started': 'Not Started', 'In progress': 'In Progress', Done: 'Completed' })[value] || value || 'Not Started';
+    }
+    function upgradeState(value) {
+      value.settings = value.settings || {};
+      value.setup_items = Array.isArray(value.setup_items) ? value.setup_items : [];
+      value.weekly = value.weekly.map(item => ({
+        ...item,
+        start_date: item.start_date || '',
+        focus: item.focus || '',
+        deliverables: item.deliverables || '',
+        planned_hours: Number(item.planned_hours) || 0,
+        actual_hours: Number(item.actual_hours ?? item.hours) || 0,
+        hands_on: item.hands_on === true || item.hands_on === 'Yes',
+        status: normalizeStatus(item.status)
+      }));
+      value.topics = value.topics.map(item => ({
+        ...item,
+        phase: item.phase || item.category || 'Uncategorized',
+        label: item.label || 'CORE',
+        week: Number(item.week) || 0,
+        status: normalizeStatus(item.status),
+        hands_on: Boolean(item.hands_on),
+        completed_date: item.completed_date || '',
+        hours: Number(item.hours) || 0,
+        hints: item.hints || '',
+        notes: item.notes || ''
+      }));
+      value.projects = value.projects.map(item => ({
+        ...item,
+        title: item.title || item.name || '',
+        week: Number(item.week) || 0,
+        status: normalizeStatus(item.status),
+        build: item.build || '',
+        skills: item.skills || '',
+        when: item.when || '',
+        progress: Number(item.progress) || 0,
+        hours: Number(item.hours) || 0,
+        notes: item.notes || ''
+      }));
+      value.scenarios = value.scenarios.map(item => ({
+        ...item,
+        week: Number(item.week) || 0,
+        hints: Number(item.hints) || 0,
+        status: normalizeStatus(item.status),
+        root_cause: item.root_cause || item.notes || '',
+        date: item.date || '',
+        hours: Number(item.hours) || 0,
+        hands_on: Boolean(item.hands_on)
+      }));
+      value.setup_items = value.setup_items.map(item => ({ ...item, status: normalizeStatus(item.status) }));
+      value.quiz_log = value.quiz_log.map(item => ({
+        ...item,
+        lesson: item.lesson || item.quiz_name || '',
+        week: Number(item.week) || 0,
+        type: item.type || 'Quiz',
+        status: normalizeStatus(item.status),
+        percentage: Number(item.percentage) || 0,
+        notes: item.notes || ''
+      }));
+      if (!Number.isInteger(Number(value.settings.curriculum_version)) ||
+          Number(value.settings.curriculum_version) < CURRICULUM_VERSION) {
+        const identities = {
+          weekly: item => String(item.week_num),
+          topics: item => String(item.title || '').toLowerCase(),
+          projects: item => String(item.title || '').toLowerCase(),
+          scenarios: item => String(item.title || '').toLowerCase(),
+          setup_items: item => String(item.item || '').toLowerCase(),
+          quiz_log: item => `${item.date}|${String(item.lesson || '').toLowerCase()}`
+        };
+        ['weekly', 'topics', 'projects', 'scenarios', 'setup_items', 'quiz_log'].forEach(key => {
+          const existing = value[key];
+          const consumed = new Set();
+          const seeded = DEFAULT_STATE[key].map(seed => {
+            const matchIndex = existing.findIndex((item, index) => !consumed.has(index) && (
+              String(item.id) === String(seed.id) || identities[key](item) === identities[key](seed)
+            ));
+            if (matchIndex < 0) return seed;
+            consumed.add(matchIndex);
+            return { ...seed, ...existing[matchIndex] };
+          });
+          value[key] = [...seeded, ...existing.filter((_, index) => !consumed.has(index))];
+        });
+        value.settings.curriculum_version = CURRICULUM_VERSION;
+        stateNeedsPersistence = true;
+      }
+      return value;
+    }
+    function persist() {
+      state.last_updated = new Date().toISOString();
+      localStorage.setItem(KEYS.state, JSON.stringify(state));
+      localStorage.setItem(KEYS.dirty, String(dirty));
+    }
+    function setStatus(text) { document.getElementById('syncStatus').textContent = text; }
+    function node(tag, text) {
+      const el = document.createElement(tag);
+      if (text !== undefined) el.textContent = String(text);
+      return el;
+    }
+    function makeButton(text, className, handler) {
+      const button = node('button', text);
+      if (className) button.className = className;
+      button.type = 'button';
+      button.addEventListener('click', handler);
+      return button;
+    }
+    function markChanged() {
+      revision++;
+      dirty = true;
+      stateNeedsPersistence = false;
+      persist();
+      localStorage.setItem(KEYS.queue, JSON.stringify({
+        payload: state,
+        timestamp: new Date().toISOString()
+      }));
+      renderDashboard();
+      setStatus(navigator.onLine ? 'Changes pending sync' : 'Offline — changes saved locally');
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(syncCloud, 700);
+    }
+    function makeCellInput(item, field, type, rowIndex, key) {
+      const td = node('td');
+      let input;
+      if (type === 'readonly') {
+        td.textContent = item[field] ?? '';
+        return td;
+      }
+      if (type === 'status') {
+        input = node('select');
+        STATUSES.forEach(status => {
+          const option = node('option', status);
+          option.value = status;
+          option.selected = item[field] === status;
+          input.append(option);
+        });
+      } else if (type === 'checkbox') {
+        input = node('input');
+        input.type = 'checkbox';
+        input.checked = Boolean(item[field]);
+      } else if (type === 'computed') {
+        td.textContent = `${Number(item.percentage) || 0}%`;
+        return td;
+      } else if (type === 'label') {
+        input = node('select');
+        ['CORE', 'IMPORTANT', 'OPTIONAL'].forEach(label => {
+          const option = node('option', label);
+          option.value = label;
+          option.selected = (item[field] || 'CORE') === label;
+          input.append(option);
+        });
+      } else {
+        input = node('input');
+        input.type = type;
+        input.value = item[field] == null ? '' : String(item[field]);
+        if (type === 'number') {
+          input.step = 'any';
+          input.min = '0';
+          if (field === 'progress') input.max = '100';
+        }
+      }
+      input.setAttribute('aria-label', fields[key].find(f => f[0] === field)[1]);
+      input.addEventListener('change', () => {
+        let value = type === 'checkbox' ? input.checked : input.value;
+        if (type === 'number') value = input.value === '' ? 0 : Number(input.value);
+        if (type === 'number' && (!Number.isFinite(value) || value < 0 || (field === 'progress' && value > 100))) {
+          input.value = String(item[field] || 0);
+          return;
+        }
+        item[field] = value;
+        if (key === 'quiz_log' && (field === 'score' || field === 'total')) {
+          const total = Number(item.total);
+          item.percentage = total > 0 ? Math.round((Number(item.score) / total) * 100) : 0;
+          renderCollection(key);
+        }
+        markChanged();
+      });
+      td.append(input);
+      return td;
+    }
+    function renderCollection(key) {
+      const header = document.getElementById(`${key}Head`);
+      const body = document.getElementById(`${key}Body`);
+      header.replaceChildren();
+      body.replaceChildren();
+      const headRow = node('tr');
+      fields[key].forEach(([, title]) => headRow.append(node('th', title)));
+      headRow.append(node('th', 'Action'));
+      header.append(headRow);
+      const query = key === 'topics' ? document.getElementById('topicSearch').value.trim().toLowerCase() : '';
+      const statusFilter = key === 'topics' ? document.getElementById('topicStatusFilter').value : '';
+      const phaseFilter = key === 'topics' ? document.getElementById('topicPhaseFilter').value : '';
+      const labelFilter = key === 'topics' ? document.getElementById('topicLabelFilter').value : '';
+      if (key === 'topics') {
+        const phaseSelect = document.getElementById('topicPhaseFilter');
+        const currentPhase = phaseSelect.value;
+        const phases = [...new Set(state.topics.map(topic => topic.phase).filter(Boolean))];
+        phaseSelect.replaceChildren(new Option('All phases', ''), ...phases.map(phase => new Option(phase, phase)));
+        phaseSelect.value = phases.includes(currentPhase) ? currentPhase : '';
+      }
+      state[key].forEach((item, index) => {
+        if (key === 'topics') {
+          const haystack = [item.title, item.phase, item.label, item.hints, item.notes].join(' ').toLowerCase();
+          if ((query && !haystack.includes(query)) ||
+              (statusFilter && item.status !== statusFilter) ||
+              (phaseFilter && item.phase !== phaseFilter) ||
+              (labelFilter && item.label !== labelFilter)) return;
+        }
+        const row = node('tr');
+        fields[key].forEach(([field, , type]) => row.append(makeCellInput(item, field, type, index, key)));
+        const action = node('td');
+        action.className = 'action';
+        action.append(makeButton('Delete', 'danger', () => {
+          state[key].splice(index, 1);
+          markChanged();
+          renderAll();
+        }));
+        row.append(action);
+        body.append(row);
+      });
+    }
+    function renderDashboard() {
+      const all = [...state.topics, ...state.projects, ...state.scenarios];
+      const completed = all.filter(item => item.status === 'Completed').length;
+      const percent = all.length ? Math.round(completed / all.length * 100) : 0;
+      const hours = [...state.weekly, ...state.topics, ...state.projects, ...state.scenarios]
+        .reduce((sum, item) => sum + (Number(item.actual_hours ?? item.hours) || 0), 0);
+      const quizAverage = state.quiz_log.length
+        ? Math.round(state.quiz_log.reduce((sum, quiz) => sum + (Number(quiz.percentage) || 0), 0) / state.quiz_log.length)
+        : 0;
+      const setupDone = state.setup_items.filter(item => item.status === 'Completed').length;
+      const hintsUsed = state.scenarios.reduce((sum, scenario) => sum + (Number(scenario.hints) || 0), 0);
+      const metrics = document.getElementById('metrics');
+      metrics.replaceChildren();
+      [['Overall progress', `${percent}%`], ['Study hours', `${hours.toFixed(1)}h`],
+        ['Completed items', `${completed} / ${all.length}`], ['Quiz average', `${quizAverage}%`],
+        ['Projects done', `${state.projects.filter(item => item.status === 'Completed').length} / ${state.projects.length}`],
+        ['Scenarios solved', `${state.scenarios.filter(item => item.status === 'Completed').length} / ${state.scenarios.length}`],
+        ['Setup checklist', `${setupDone} / ${state.setup_items.length}`], ['Hints used', String(hintsUsed)]
+      ].forEach(([label, value]) => {
+        const card = node('div');
+        card.className = 'card';
+        const metric = node('div', label);
+        metric.className = 'metric';
+        const number = node('div', value);
+        number.className = 'value';
+        card.append(metric, number);
+        metrics.append(card);
+      });
+      const groups = new Map();
+      state.topics.forEach(topic => {
+        const category = String(topic.phase || 'Uncategorized');
+        const stats = groups.get(category) || { total: 0, done: 0 };
+        stats.total++;
+        if (topic.status === 'Completed') stats.done++;
+        groups.set(category, stats);
+      });
+      const categoryContainer = document.getElementById('categoryProgress');
+      categoryContainer.replaceChildren();
+      if (!groups.size) categoryContainer.append(node('p', 'No topics recorded.'));
+      groups.forEach((stats, name) => {
+        const pct = Math.round(stats.done / stats.total * 100);
+        const row = node('div');
+        row.className = 'phase-card';
+        const title = node('strong', name);
+        const detail = node('span', ` ${pct}% · ${stats.done}/${stats.total}`);
+        detail.className = 'muted';
+        row.append(title, detail);
+        const bar = node('div');
+        bar.className = 'progress';
+        const fill = node('span');
+        fill.style.width = `${pct}%`;
+        bar.append(fill);
+        row.append(bar);
+        categoryContainer.append(row);
+      });
+      const weak = document.getElementById('weakAreas');
+      weak.replaceChildren();
+      const quizzes = state.quiz_log.filter(q => String(q.weak_areas || '').trim());
+      if (!quizzes.length) weak.append(node('p', 'No weak areas recorded yet.'));
+      quizzes.forEach(q => weak.append(node('p', `${q.lesson || 'Quiz'} (${Number(q.percentage) || 0}%): ${q.weak_areas}`)));
+    }
+    function renderAll() {
+      renderDashboard();
+      Object.keys(fields).forEach(renderCollection);
+      updatePairingLink();
+    }
+    function addRecord(key) {
+      const defaults = {
+        weekly: { week_num: state.weekly.length + 1, start_date: '', focus: '', deliverables: '', planned_hours: 0, actual_hours: 0, status: 'Not Started', hands_on: false, notes: '' },
+        topics: { phase: 'General', title: '', label: 'CORE', week: 0, status: 'Not Started', hands_on: false, completed_date: '', hours: 0, hints: '', notes: '' },
+        projects: { title: '', build: '', skills: '', week: 0, when: '', status: 'Not Started', progress: 0, hours: 0, start_date: '', end_date: '', notes: '' },
+        scenarios: { title: '', category: 'General', week: 0, hints: 0, status: 'Not Started', root_cause: '', date: '', hours: 0, hands_on: false },
+        setup_items: { item: '', when: '', status: 'Not Started' },
+        quiz_log: { date: new Date().toISOString().slice(0, 10), week: 0, lesson: '', type: 'Quiz', score: 0, total: 0, percentage: 0, weak_areas: '', notes: '' }
+      };
+      state[key].push({ id: crypto.randomUUID(), ...defaults[key] });
+      markChanged();
+      renderAll();
+    }
+    function parseStored(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) || fallback; }
+      catch (error) { console.error(`Invalid ${key} setting:`, error); return fallback; }
+    }
+    function getCreds() { return parseStored(KEYS.vault, null); }
+    function restorePendingQueue() {
+      const queued = parseStored(KEYS.queue, null);
+      if (!queued || !isValidState(queued.payload)) return;
+      state = upgradeState(queued.payload);
+      localStateError = '';
+      dirty = true;
+      persist();
+    }
+    function hasProgressData(value) {
+      return ['weekly', 'topics', 'projects', 'scenarios', 'quiz_log']
+        .some(key => value[key].length > 0);
+    }
+    function freshProgressState() {
+      const fresh = defaultState();
+      fresh.topics.forEach(item => {
+        item.status = 'Not Started';
+        item.hands_on = false;
+        item.completed_date = '';
+        item.notes = '';
+      });
+      fresh.projects.forEach(item => { item.status = 'Not Started'; item.progress = 0; item.notes = ''; });
+      fresh.scenarios.forEach(item => { item.status = 'Not Started'; item.hints = 0; item.root_cause = ''; item.date = ''; });
+      fresh.weekly.forEach(item => { item.status = 'Not Started'; item.actual_hours = 0; item.hands_on = false; item.notes = ''; });
+      fresh.setup_items.forEach(item => { item.status = 'Not Started'; });
+      fresh.quiz_log = [];
+      return fresh;
+    }
+    function validCreds(creds) {
+      return creds && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(creds.vault_id) &&
+        typeof creds.token === 'string' && /^[0-9a-f]{64}$/i.test(creds.token);
+    }
+    function readPairingFragment() {
+      if (!location.hash) return;
+      const params = new URLSearchParams(location.hash.slice(1));
+      const creds = { vault_id: params.get('vault_id'), token: params.get('token') };
+      if (!validCreds(creds)) {
+        setStatus('Invalid pairing link');
+        history.replaceState(null, '', location.pathname + location.search);
+        return;
+      }
+      localStorage.setItem(KEYS.vault, JSON.stringify(creds));
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+    function updatePairingLink() {
+      const input = document.getElementById('pairingLink');
+      const creds = getCreds();
+      input.value = validCreds(creds)
+        ? `${location.origin}${location.pathname}#vault_id=${encodeURIComponent(creds.vault_id)}&token=${encodeURIComponent(creds.token)}`
+        : 'Pairing link will appear after the cloud vault is created.';
+    }
+    function connectClient() {
+      const cfg = parseStored(KEYS.config, {});
+      if (!cfg.url || !cfg.key || !window.supabase) {
+        client = null;
+        return false;
+      }
+      try {
+        const parsed = new URL(cfg.url);
+        if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost') throw new Error('Supabase URL must use HTTPS.');
+        client = window.supabase.createClient(cfg.url, cfg.key);
+        return true;
+      } catch (error) {
+        client = null;
+        document.getElementById('setupNotice').textContent = `Unable to connect: ${error.message}`;
+        return false;
+      }
+    }
+    function secureToken() {
+      if (!crypto || !crypto.getRandomValues) throw new Error('A secure random number generator is unavailable. Use HTTPS.');
+      return Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    async function syncCloud() {
+      if (syncing) return;
+      if (localStateError) {
+        setStatus('Local data invalid — cloud sync paused');
+        document.getElementById('setupNotice').textContent = `Local data could not be loaded safely: ${localStateError}. Import a valid backup before syncing.`;
+        return;
+      }
+      if (!navigator.onLine) { setStatus('Offline — changes saved locally'); return; }
+      if (!client && !connectClient()) { setStatus('Local only — configure cloud in Setup'); return; }
+      syncing = true;
+      const startedRevision = revision;
+      const startedDirty = dirty;
+      try {
+        let creds = getCreds();
+        if (!validCreds(creds)) {
+          const decision = localStorage.getItem(KEYS.migrationDecision);
+          if (hasProgressData(state) && !migrationPrompted && decision !== 'upload' && decision !== 'fresh') {
+            migrationPrompted = true;
+            setStatus('Choose how to migrate local progress');
+            openChoiceDialog(
+              'Upload Existing Progress?',
+              'Existing progress was found on this device. Would you like to upload it to the cloud?',
+              [
+                { text: 'Upload Existing Progress', onClick: async () => {
+                  localStorage.setItem(KEYS.migrationDecision, 'upload');
+                  dirty = true;
+                  persist();
+                  closeChoiceDialog();
+                  await syncCloud();
+                } },
+                { text: 'Start Fresh', className: 'secondary', onClick: async () => {
+                  localStorage.setItem(KEYS.migrationDecision, 'fresh');
+                  state = freshProgressState();
+                  dirty = true;
+                  revision++;
+                  persist();
+                  renderAll();
+                  closeChoiceDialog();
+                  await syncCloud();
+                } },
+                { text: 'Cancel', className: 'secondary', onClick: () => closeChoiceDialog() }
+              ]
+            );
+            return;
+          }
+          await createCloudVault(state, startedRevision);
+          return;
+        }
+        const { data, error } = await client.rpc('vault_get', {
+          p_vault_id: creds.vault_id, p_secret_token: creds.token
+        });
+        if (error) throw error;
+        if (!data || data.status !== 'success' || !isValidState(data.data)) throw new Error('Cloud returned invalid tracker data.');
+        const serverVersion = Number(data.version);
+        if (!Number.isSafeInteger(serverVersion) || serverVersion < 1) throw new Error('Cloud returned an invalid version.');
+        if (!startedDirty && revision === startedRevision) {
+          state = upgradeState(data.data);
+          cloudVersion = serverVersion;
+          localStorage.setItem(KEYS.cloudVersion, String(cloudVersion));
+          persist();
+          renderAll();
+        } else if (serverVersion > cloudVersion) {
+          showConflict(data.data, serverVersion);
+          return;
+        }
+        if (dirty) await pushState(creds, startedRevision);
+        else setStatus('Synced');
+        retryDelay = 1500;
+      } catch (error) {
+        console.error('Cloud sync failed:', error);
+        setStatus(`Sync failed — retrying (${error.message})`);
+        scheduleRetry();
+      } finally {
+        syncing = false;
+      }
+    }
+    async function createCloudVault(payload, startedRevision) {
+      const token = secureToken();
+      const snapshot = JSON.parse(JSON.stringify(payload));
+      const { data, error } = await client.rpc('vault_create', {
+        p_secret_token: token,
+        p_initial_data: snapshot
+      });
+      if (error) throw error;
+      if (!data || data.status !== 'success' || !data.vault_id) throw new Error('Vault creation returned an unexpected response.');
+      const creds = { vault_id: data.vault_id, token };
+      localStorage.setItem(KEYS.vault, JSON.stringify(creds));
+      cloudVersion = Number(data.version) || 1;
+      localStorage.setItem(KEYS.cloudVersion, String(cloudVersion));
+      updatePairingLink();
+      localStorage.removeItem(KEYS.migrationDecision);
+      if (revision === startedRevision) {
+        dirty = false;
+        localStorage.setItem(KEYS.dirty, 'false');
+        localStorage.removeItem(KEYS.queue);
+        setStatus('Cloud vault created');
+      } else {
+        dirty = true;
+        persist();
+        setStatus('Cloud vault created; newer local edits pending sync');
+        setTimeout(syncCloud, 0);
+      }
+    }
+    async function pushState(creds, startedRevision) {
+      const snapshot = JSON.parse(JSON.stringify(state));
+      const { data, error } = await client.rpc('vault_save', {
+        p_vault_id: creds.vault_id,
+        p_secret_token: creds.token,
+        p_data: snapshot,
+        p_client_updated_at: new Date().toISOString(),
+        p_expected_version: cloudVersion
+      });
+      if (error) throw error;
+      if (data && data.status === 'conflict') {
+        showConflict(data.server_data, Number(data.server_version));
+        return;
+      }
+      if (!data || data.status !== 'success' || !Number.isSafeInteger(Number(data.version))) {
+        throw new Error('Cloud save returned an unexpected response.');
+      }
+      cloudVersion = Number(data.version);
+      localStorage.setItem(KEYS.cloudVersion, String(cloudVersion));
+      if (revision === startedRevision) {
+        dirty = false;
+        localStorage.setItem(KEYS.dirty, 'false');
+        localStorage.removeItem(KEYS.queue);
+        setStatus('Synced');
+      } else {
+        setStatus('Newer local edits pending sync');
+        setTimeout(syncCloud, 0);
+      }
+    }
+    function showConflict(serverData, serverVersion) {
+      if (!isValidState(serverData) || !Number.isSafeInteger(serverVersion) || serverVersion < 1) {
+        throw new Error('Cloud conflict response contains invalid data.');
+      }
+      openChoiceDialog(
+        'Sync Conflict',
+        'Local and cloud progress differ. Choose which version to keep. You can export a local backup before deciding.',
+        [
+          { text: 'Use Cloud Data', className: 'secondary', onClick: () => {
+            state = upgradeState(serverData);
+            cloudVersion = serverVersion;
+            dirty = false;
+            localStorage.setItem(KEYS.cloudVersion, String(cloudVersion));
+            localStorage.setItem(KEYS.dirty, 'false');
+            localStorage.removeItem(KEYS.queue);
+            persist();
+            renderAll();
+            closeChoiceDialog();
+            setStatus('Cloud version loaded');
+          } },
+          { text: 'Use Local Data', className: 'danger', onClick: () => {
+            cloudVersion = serverVersion;
+            localStorage.setItem(KEYS.cloudVersion, String(cloudVersion));
+            dirty = true;
+            persist();
+            localStorage.setItem(KEYS.queue, JSON.stringify({ payload: state, timestamp: new Date().toISOString() }));
+            closeChoiceDialog();
+            setTimeout(syncCloud, 0);
+          } },
+          { text: 'Export Local Backup First', className: 'secondary', onClick: () => exportJsonBackup() }
+        ]
+      );
+    }
+    function openChoiceDialog(title, body, choices) {
+      document.getElementById('choiceTitle').textContent = title;
+      document.getElementById('choiceBody').textContent = body;
+      const actions = document.getElementById('choiceActions');
+      actions.replaceChildren();
+      choices.forEach(choice => {
+        const button = makeButton(choice.text, choice.className || '', choice.onClick);
+        actions.append(button);
+      });
+      document.getElementById('choiceDialog').hidden = false;
+      actions.querySelector('button')?.focus();
+    }
+    function closeChoiceDialog() {
+      document.getElementById('choiceDialog').hidden = true;
+    }
+    function scheduleRetry() {
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        syncCloud();
+        retryDelay = Math.min(retryDelay * 2, 60000);
+      }, retryDelay);
+    }
+    function download(content, type, filename) {
+      const url = URL.createObjectURL(new Blob([content], { type }));
+      const link = node('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+    function sheetRows(key) {
+      return [fields[key].map(field => field[1]), ...state[key].map(item => fields[key].map(([name]) => item[name] ?? ''))];
+    }
+    document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab]').forEach(tab => tab.setAttribute('aria-selected', String(tab === button)));
+      document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === button.dataset.tab));
+    }));
+    document.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => addRecord(button.dataset.add)));
+    document.getElementById('topicSearch').addEventListener('input', () => renderCollection('topics'));
+    document.getElementById('topicStatusFilter').addEventListener('change', () => renderCollection('topics'));
+    document.getElementById('topicPhaseFilter').addEventListener('change', () => renderCollection('topics'));
+    document.getElementById('topicLabelFilter').addEventListener('change', () => renderCollection('topics'));
+    document.getElementById('saveConfig').addEventListener('click', async () => {
+      const url = document.getElementById('supabaseUrl').value.trim();
+      const key = document.getElementById('supabaseKey').value.trim();
+      try {
+        if (!url || !key) throw new Error('Enter both the project URL and public anon key.');
+        localStorage.setItem(KEYS.config, JSON.stringify({ url, key }));
+        if (!connectClient()) throw new Error(document.getElementById('setupNotice').textContent || 'Client initialization failed.');
+        document.getElementById('setupNotice').textContent = 'Configuration saved.';
+        await syncCloud();
+      } catch (error) { document.getElementById('setupNotice').textContent = error.message; }
+    });
+    document.getElementById('syncNow').addEventListener('click', syncCloud);
+    document.getElementById('copyPairing').addEventListener('click', async () => {
+      try {
+        const value = document.getElementById('pairingLink').value;
+        if (!value.includes('#vault_id=')) throw new Error('Create or connect a cloud vault first.');
+        await navigator.clipboard.writeText(value);
+        document.getElementById('setupNotice').textContent = 'Private pairing link copied.';
+      } catch (error) { document.getElementById('setupNotice').textContent = `Unable to copy link: ${error.message}`; }
+    });
+    function exportJsonBackup() {
+      download(JSON.stringify(state, null, 2), 'application/json', `progress-backup-${new Date().toISOString().slice(0, 10)}.json`);
+    }
+    document.getElementById('exportJson').addEventListener('click', exportJsonBackup);
+    document.getElementById('importJson').addEventListener('change', async event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const imported = JSON.parse(await file.text());
+        if (!isValidState(imported)) throw new Error('Backup is missing a required array or contains an invalid collection.');
+        if (!confirm('Replace the current tracker data with this backup?')) return;
+        state = upgradeState(imported);
+        localStateError = '';
+        markChanged();
+        renderAll();
+        document.getElementById('exportNotice').textContent = 'Backup imported; local data is saved.';
+      } catch (error) {
+        document.getElementById('exportNotice').textContent = `Import failed: ${error.message}`;
+      } finally { event.target.value = ''; }
+    });
+    document.getElementById('exportExcel').addEventListener('click', () => {
+      try {
+        if (!window.XLSX) throw new Error('Excel library is unavailable. Connect to the internet and reload, or use JSON backup.');
+        const workbook = XLSX.utils.book_new();
+        const trackableItems = [...state.topics, ...state.projects, ...state.scenarios];
+        const completedItems = trackableItems.filter(item => item.status === 'Completed').length;
+        const totalHours = [...state.weekly, ...state.topics, ...state.projects, ...state.scenarios]
+          .reduce((sum, item) => sum + (Number(item.actual_hours ?? item.hours) || 0), 0);
+        const quizAverage = state.quiz_log.length
+          ? Math.round(state.quiz_log.reduce((sum, quiz) => sum + (Number(quiz.percentage) || 0), 0) / state.quiz_log.length)
+          : 0;
+        const weakQuizzes = state.quiz_log.filter(quiz => String(quiz.weak_areas || '').trim());
+        const summary = [
+          ['Metric', 'Value'],
+          ['Overall completion', `${completedItems} / ${trackableItems.length} (${trackableItems.length ? Math.round(completedItems / trackableItems.length * 100) : 0}%)`],
+          ['Topics completed', `${state.topics.filter(item => item.status === 'Completed').length} / ${state.topics.length}`],
+          ['Projects completed', `${state.projects.filter(item => item.status === 'Completed').length} / ${state.projects.length}`],
+          ['Scenarios completed', `${state.scenarios.filter(item => item.status === 'Completed').length} / ${state.scenarios.length}`],
+          ['Study hours', Number(totalHours.toFixed(1))],
+          ['Quiz average', `${quizAverage}%`],
+          ['Weak areas identified', weakQuizzes.length],
+          ['Setup tasks completed', `${state.setup_items.filter(item => item.status === 'Completed').length} / ${state.setup_items.length}`]
+        ];
+        const phaseTotals = new Map();
+        state.topics.forEach(topic => {
+          const phase = topic.phase || 'Uncategorized';
+          const totals = phaseTotals.get(phase) || { total: 0, completed: 0 };
+          totals.total++;
+          if (topic.status === 'Completed') totals.completed++;
+          phaseTotals.set(phase, totals);
+        });
+        const phaseBreakdown = [
+          ['Phase', 'Total topics', 'Completed', 'Completion']
+        ];
+        phaseTotals.forEach((totals, phase) => {
+          phaseBreakdown.push([
+            phase,
+            totals.total,
+            totals.completed,
+            `${Math.round(totals.completed / totals.total * 100)}%`
+          ]);
+        });
+        const sheets = [
+          ['Summary', summary], ['Dashboard', phaseBreakdown], ['Weekly', sheetRows('weekly')],
+          ['Topics', sheetRows('topics')], ['Projects', sheetRows('projects')],
+          ['Scenarios', sheetRows('scenarios')],
+          ['Setup', [
+            ['Setting', 'Value'],
+            ['Title', state.settings.user_title || 'Learning Progress Tracker'],
+            ['Target hours', state.settings.target_hours || 0],
+            [],
+            ['Checklist item', 'When', 'Status'],
+            ...state.setup_items.map(item => [item.item, item.when, item.status])
+          ]],
+          ['Quiz Log', sheetRows('quiz_log')],
+          ['Weak Areas', [
+            ['Quiz', 'Date', 'Percentage', 'Weak areas', 'Notes'],
+            ...weakQuizzes.map(quiz => [quiz.lesson, quiz.date, `${Number(quiz.percentage) || 0}%`, quiz.weak_areas, quiz.notes || ''])
+          ]]
+        ];
+        sheets.forEach(([name, rows]) => {
+          const sheet = XLSX.utils.aoa_to_sheet(rows);
+          const columnCount = Math.max(...rows.map(row => row.length));
+          sheet['!cols'] = Array.from({ length: columnCount }, (_, columnIndex) => {
+            const contentWidth = Math.max(...rows.map(row => String(row[columnIndex] ?? '').length));
+            return { wch: Math.min(48, Math.max(columnIndex === 0 ? 18 : 12, contentWidth + 2)) };
+          });
+          if (rows.length > 1) {
+            sheet['!autofilter'] = {
+              ref: XLSX.utils.encode_range({
+                s: { r: 0, c: 0 },
+                e: { r: rows.length - 1, c: columnCount - 1 }
+              })
+            };
+          }
+          XLSX.utils.book_append_sheet(workbook, sheet, name);
+        });
+        XLSX.writeFile(workbook, `progress-tracker-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        document.getElementById('exportNotice').textContent = 'Excel export complete.';
+      } catch (error) { document.getElementById('exportNotice').textContent = `Excel export failed: ${error.message}`; }
+    });
+    window.addEventListener('online', () => { setStatus('Reconnected — syncing'); syncCloud(); });
+    window.addEventListener('offline', () => setStatus('Offline — changes saved locally'));
+    window.addEventListener('storage', event => {
+      if (event.key === KEYS.state) { state = loadState(); renderAll(); }
+    });
+    readPairingFragment();
+    const config = parseStored(KEYS.config, {});
+    document.getElementById('supabaseUrl').value = config.url || DEFAULT_SUPABASE_URL;
+    document.getElementById('supabaseKey').value = config.key || '';
+    restorePendingQueue();
+    if (stateNeedsPersistence) markChanged();
+    renderAll();
+    if (dirty) setStatus('Local changes pending sync');
+    else setStatus('Local data ready');
+    if (navigator.onLine && connectClient()) syncCloud();
+  </script>
+</body>
+</html>
